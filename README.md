@@ -1,5 +1,3 @@
-
-
 ## libraries to import to rpi:
 	sudo apt-get update
 	sudo apt-get upgrade
