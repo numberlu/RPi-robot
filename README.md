@@ -7,6 +7,7 @@
   	sudo apt-get install python-smbus
 	sudo apt-get install i2c-tools
  	sudo pip3 install adafruit-circuitpython-servokit
+  	pip3 install adafruit-circuitpython-pca9685
   	sudo apt-get install python3-opencv
 	sudo apt-get install libqt4-test python3-sip python3-pyqt5 libqtgui4 libjasper-dev libatlas-base-dev -y
 	pip3 install opencv-contrib-python==4.1.0.25
