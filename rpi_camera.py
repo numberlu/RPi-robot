@@ -1,75 +1,86 @@
-#import RPi.GPIO as GPIO
-from gpiozero import Servo
-from time import sleep
+import time
 import cv2
+from board import SCL, SDA
+import busio
+from adafruit_pca9685 import PCA9685
+from adafruit_motor import servo
 
-# TODO: implement queue (first belt stopping)
-# TODO: implement wait time based on IRL measurements and two belts
-wait = 2
- 
-
-# GPIO17 - servo #1
-servo_1 = Servo(17)
-# GPIO27 - servo #2
-servo_2 = Servo(27)
-# GPIO22 - servo #3
-servo_3 = Servo(22)
-# GPIO5 - servo #4
-servo_4 = Servo(5)
-
-# just placeholders (ba dum tss)
-def servo_picker(data):
-    match data:
-        case "Eindhoven":
-            servo_manipulator(servo_1)
-        case "Vilnius":
-            servo_manipulator(servo_2)
-        case "Madrid":
-            servo_manipulator(servo_3)
-        case "Dubai":
-            servo_manipulator(servo_4)
-
-
-def servo_manipulator(servo):
-    try: 
-        servo.max()
-        sleep(wait)
-        servo.min()
-    except KeyboardInterrupt:
-        print()
-
-# set up camera object
-cap = cv2.VideoCapture(0)
-
-# QR code detection object
+cam = cv2.VideoCapture(0)
 detector = cv2.QRCodeDetector()
+detected_object = False
 
-# TODO: figure out how to manipulate camera - how to turn it on/off
-while True:
-    # get the image
-    _, img = cap.read()
-    # get bounding box coords and data
-    data, bbox, _ = detector.detectAndDecode(img)
+def stop_belt():
+    #TODO: stop the motor 
+    return
+
+#TODO: we might want to take a few images to be sure it is focused
+def take_photo():
+    ret, image = cam.read()
+    if not ret:
+        print("failed to take an image")
+        return
+    else: 
+        return image
     
-    # if there is a bounding box, draw one, along with the data
-    if(bbox is not None):
-        for i in range(len(bbox)):
-            cv2.line(img, tuple(bbox[i][0]), tuple(bbox[(i+1) % len(bbox)][0]), color=(255,
-                     0, 255), thickness=2)
-        cv2.putText(img, data, (int(bbox[0][0][0]), int(bbox[0][0][1]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 2)
-        
-        if data:
-            print("data found: ", data)
-    # display the image preview on the monitor (for now)
-    # delete later
-    cv2.imshow("code detector", img)
-    if(cv2.waitKey(1) == ord("q")):
-        break
+#decodes the qr code and sends back data
+def qr(image):
+    data, vertices_array = detector.detectAndDecode(image)
+    # if there is a QR code
+    if vertices_array is not None:
+        return data
+    else:
+        print("No QR codes found")
+        wait_for_disk()
+    
+def move_servo(servo, delay):
+    servo.angle = 90    #TODO: measure irl
+    time.sleep(delay)
+    servo.angle = 0
+    return
 
-    servo_picker(data)
+def move_belt():
+    #TODO: start to move belt
+    return
 
-# free camera object and exit
-cap.release()
-cv2.destroyAllWindows()
+def which_servo(data):
+    match data:
+        case "Vilnius":
+            move_servo(SERVO_1, 2) #TODO measure irl
+        case "Eindhoven":
+            move_servo(SERVO_2, 4)
+        case "Dublin":
+            move_servo(SERVO_3, 6)
+    return        
+
+#the working function (maybe we could use main instead of this but idk python well enough)
+def wait_for_disk():
+    while True:
+        if detected_object:
+            stop_belt()
+            image = take_photo()
+            qr(image)
+            move_belt()
+            which_servo()
+            wait_for_disk()
+
+#the program starts from here by trying to initialise ada and servos
+try:
+    # Initialize I2C bus
+    i2c_bus = busio.I2C(SCL, SDA)
+
+    # Create PCA9685 class instance
+    pca = PCA9685(i2c_bus)
+    pca.frequency = 50
+
+    #Creating servo objects on PCA channels 0, 8 and 15    
+    SERVO_1 = servo.Servo(pca.channels[0])
+    SERVO_2 = servo.Servo(pca.channels[8])
+    SERVO_3 = servo.Servo(pca.channels[15])
+
+except Exception as e:
+    print(f"An error occurred: {e}")
+
+wait_for_disk()
+#signals from IR make the belt stop and camera take a picture (or 5 for example)
+#cv2 decodes images and moves servos
 
