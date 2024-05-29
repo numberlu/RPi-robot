@@ -34,6 +34,7 @@ def qr(image):
     
 def move_servo(servo, delay):
     servo.angle = 90    #TODO: measure irl
+    #TODO: change so that it returns after IR sensor detects disk in the actual bucket
     time.sleep(delay)
     servo.angle = 0
     return
