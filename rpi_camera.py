@@ -3,9 +3,12 @@ import cv2
 from board import SCL, SDA
 import busio
 import RPi.GPIO as GPIO
+from pyzbar.pyzbar import decode
 from adafruit_pca9685 import PCA9685
 from adafruit_motor import servo
 
+#TODO if most of the picture is black
+#TODO: check if sorted correctly with IR sensors
 # GPIO setup, set IR sensors as input
 GPIO.setmode(GPIO.BCM)
 IR_PIN = 17
@@ -37,13 +40,11 @@ def take_photo():
     
 #decodes the qr code and sends back data
 def decode_qr(image):
-    data, vertices_array = detector.detectAndDecode(image)
-    # if there is a QR code
-    if vertices_array is not None:
-        return data
-    else:
-        print("No QR codes found")
-        return None
+    decoded_objects = decode(image)
+    for obj in decoded_objects:
+        return obj.data.decode("utf-8")
+    print("No QR codes found")
+    return None
     
 #TODO: what happens if there are more than one disks    
 def move_servo(servo, IR_SENSOR):
@@ -67,6 +68,7 @@ def which_servo(data):
             move_servo(SERVO_3, IR_3)
         case "Sofia":
             move_servo(SERVO_4, IR_4)
+        #TODO: if other QR codes just move it down
     return        
 
 def main():
