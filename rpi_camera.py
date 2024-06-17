@@ -6,30 +6,41 @@ import RPi.GPIO as GPIO
 from pyzbar.pyzbar import decode
 from adafruit_pca9685 import PCA9685
 from adafruit_motor import servo
+import serial
+from serial.serialutil import *
+import sys, getopt
 
 #TODO if most of the picture is black
 #TODO: check if sorted correctly with IR sensors
-# GPIO setup, set IR sensors as input
-GPIO.setmode(GPIO.BCM)
-IR_PIN = 17
-GPIO.setup(IR_PIN, GPIO.IN)
-IR_1 = 27
-GPIO.setup(IR_1, GPIO.IN)
-IR_2 = 22
-GPIO.setup(IR_2, GPIO.IN)
-IR_3 = 23
-GPIO.setup(IR_3, GPIO.IN)
-IR_4 = 24
-GPIO.setup(IR_4, GPIO.IN)
+class Communication:
+    def __init__(self, port):
+        self.ser = None
+        self.connected = False
+        try:
+            self.ser = serial.Serial(port, 115200, timeout=1)
+            # self.ser = serial.Serial()
+            # self.ser.port = port
+            # self.ser.bardrate = 115200
+            # self.ser.timeout = 1
+            self.ser.setDTR(True)
+            time.sleep(0.5)
+            self.ser.setDTR(False)
+            # self.ser.open()
+        except:
+            print("serial open failed")
+    
+    def setMotor(self, chan, speed):
+        self.ser.write(bytes(f"{chan},{speed}\n", encoding='utf8'))
+    
+    def __del__(self):
+        if (self.ser is not None):
+            self.ser.close()
 
-cam = cv2.VideoCapture(0)
-detector = cv2.QRCodeDetector()
-
-def stop_first_belt():
-    #TODO: stop the motor 
+def stop_first_belt(comm):
+    comm.setMotor(1, 0) 
     return
 
-#TODO: we might want to take a few images to be sure it is focused
+#Takes photo, returns an image
 def take_photo():
     cam = cv2.VideoCapture(0)
     ret, image = cam.read()
@@ -46,54 +57,117 @@ def decode_qr(image):
     print("No QR codes found")
     return None
     
-#TODO: what happens if there are more than one disks    
+    
 def move_servo(servo, IR_SENSOR):
-    servo.angle = 90 
-    while not GPIO.input(IR_SENSOR):
-        time.sleep(1)
-    servo.angle = 0
-    return
-
-def move_first_belt():
-    #TODO: start to move belt
-    return
-
-def which_servo(data):
-    match data:
-        case "Vilnius":
-            move_servo(SERVO_1, IR_1)
-        case "Eindhoven":
-            move_servo(SERVO_2, IR_2)
-        case "Dublin":
-            move_servo(SERVO_3, IR_3)
-        case "Sofia":
-            move_servo(SERVO_4, IR_4)
-        #TODO: if other QR codes just move it down
-    return        
-
-def main():
-    try:
+    if servo is not None:
+        servo.angle = 90 
         while True:
-            #TODO: move second belt always
-            #check for IR sensor input
-            if GPIO.input(IR_PIN):
-                stop_first_belt()
-                for i in range(5):
-                    image = take_photo()
-                    if image is not None:
-                        data = decode_qr(image)
-                        if data is not None:
-                            continue
+            if GPIO.input(IR_SENSOR):
+                break
+        servo.angle = 0
+    else:
+        while True:
+            if GPIO.input(IR_SENSOR):
+                break
+    return
+
+def move_first_belt(comm):
+    comm.setMotor(1, 255)
+    return
+
+
+def which_servo_1(data):
+    match data:
+        case "Amsterdam":
+            data = 0
+        case "Vilnius":
+            data = 1
+        case "Eindhoven":
+            data = 2
+        case "Dubai":
+            data = 3
+        case _:
+            data = 4
+    move_servo(SERVOS[data], IR_SENSORS[data])
+    return
+                 
+def which_servo_2(data):
+    move_servo(SERVOS[data], IR_SENSORS[data])
+    return
+
+def prompt_choice():
+    print("Choose the way to sort:")
+    print("Press 1 to sort by QR codes")
+    print("Press 2 to sort by queue")
+    print("Press anything else to quit")
+    return input(">>") 
+
+def main(argv):
+    portPath = None
+    try:
+        opts, args = getopt.getopt(argv,"hp:",["port="])
+    except getopt.GetoptError:
+        print ("test.py -p <serial_port>")
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == "-h":
+            print ("test.py -p <serial_port>")
+            sys.exit()
+        elif opt in ("-p", "--port"):
+            portPath = arg
+    if portPath is None:
+        print ("\033[91mError: specify port")
+        sys.exit(2)
+
+    comm = None
+    try:
+        if comm is None:
+            comm = Communication(portPath)
+    except Exception as e:
+        print(e)
+        del comm
+        comm = None
+
+    try:
+        choice = prompt_choice()
+
+        #Sorting based on QR codes
+        if choice is 1:
+            while True:
+                #check for IR sensor input
+                if GPIO.input(IR_PIN):
+                    stop_first_belt(comm)
+                    for i in range(5):
+                        image = take_photo()
+                        if image is not None:
+                            data = decode_qr(image)
+                            if data is not None:
+                                continue
+                            else:
+                                print("No QR code found")
                         else:
-                            print("No QR code found")
-                    else:
-                        print("Failed to take a photo") 
-                if data is None:
-                    print("Failed to find a QR code: Manual Inspection is needed")
-                #TODO: problematic because first one will move just long enough until a second QR is detected     
-                move_first_belt()
-                which_servo()
-                time.sleep(0.3)
+                            print("Failed to take a photo") 
+                    if data is None:
+                        print("Failed to find a QR code: Manual Inspection is needed")    
+                    move_first_belt(comm)
+                    which_servo_1(data)
+
+        #Sorting based on queue
+        elif choice is 2:
+            while True:
+                for i in range(5):
+                    #check for IR sensor input on first belt
+                    if GPIO.input(IR_PIN):
+                        stop_first_belt(comm)   
+                        move_first_belt(comm)
+                        which_servo_2(i)
+                    if i == 4:
+                        i = -1
+
+        else:
+            print("Quitting...")
+            print("Program terminated")
+            return
     except KeyboardInterrupt:
         print("Program terminated")
     finally:
@@ -102,6 +176,14 @@ def main():
 
 #the program starts from here by trying to initialise ada and servos
 try:
+    # GPIO setup, set IR sensors as input
+    GPIO.setmode(GPIO.BCM)
+    IR_PIN = 17
+    GPIO.setup(IR_PIN, GPIO.IN)
+    IR_SENSORS = {27, 17, 22, 23, 24, 12}
+    for i in range(6):
+        GPIO.setup(IR_SENSORS[i], GPIO.IN)
+
     # Initialize I2C bus
     i2c_bus = busio.I2C(SCL, SDA)
 
@@ -109,18 +191,18 @@ try:
     pca = PCA9685(i2c_bus)
     pca.frequency = 50
 
-    #Creating servo objects on PCA channels 0, 8 and 15    
-    SERVO_1 = servo.Servo(pca.channels[0])
-    SERVO_2 = servo.Servo(pca.channels[8])
-    SERVO_3 = servo.Servo(pca.channels[12])
-    SERVO_4 = servo.Servo(pca.channels[15])
+    #Creating servo objects on PCA channels 0, 7, 12 and 15 
+    SERVOS = {}
+    SERVOS[0] = servo.Servo(pca.channels[0])
+    SERVOS[1] = servo.Servo(pca.channels[7])
+    SERVOS[2] = servo.Servo(pca.channels[12])
+    SERVOS[3] = servo.Servo(pca.channels[15])
+
 
 except Exception as e:
     print(f"An error occurred with initializing servos: {e}")
 
 
 if __name__ == '__main__':
-    main()
-#signals from IR make the belt stop and camera take a picture (or 5 for example)
-#cv2 decodes images and moves servos
+    main(sys.argv[1:])
 
