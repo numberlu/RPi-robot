@@ -73,6 +73,12 @@ def move_first_belt(comm):
     comm.setMotor(1, 255)
     return
 
+#moves first belt until the disk reaches the second belt
+def move_first_belt_until_second(comm):
+    move_first_belt(comm)
+    time.sleep(1)
+    stop_first_belt(comm)
+    return
 
 def which_servo_1(data):
     match data:
@@ -157,15 +163,15 @@ def main(argv):
 
         #Sorting based on queue
         elif choice is 2:
-            while True:
-                for i in range(5):
-                    #check for IR sensor input on first belt
-                    if GPIO.input(IR_PIN):
-                        stop_first_belt(comm)   
-                        move_first_belt(comm)
-                        which_servo_2(i)
-                    if i == 4:
-                        i = -1
+            for i in range(5):
+                #check for IR sensor input on first belt
+                if GPIO.input(IR_PIN):
+                    stop_first_belt(comm)
+                    move_first_belt_until_second(comm)   
+                    which_servo_2(i)
+                move_first_belt(comm)
+                if i == 4:
+                    i = -1
 
         else:
             print("Quitting...")
