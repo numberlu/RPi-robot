@@ -10,8 +10,6 @@ import serial
 from serial.serialutil import *
 import sys, getopt
 
-#TODO if most of the picture is black
-#TODO: check if sorted correctly with IR sensors
 class Communication:
     def __init__(self, port):
         self.ser = None
@@ -57,7 +55,7 @@ def decode_qr(image):
     print("No QR codes found")
     return None
     
-    
+#moves servo and waits until something passes by allocated IR sensor    
 def move_servo(servo, IR_SENSOR):
     if servo is not None:
         servo.angle = 90 
@@ -87,13 +85,18 @@ def which_servo_1(data):
         case "Dubai":
             data = 3
         case _:
-            data = 4
+            if GPIO.input(IR_SENSORS[5]):       #if the last IR sensor senses it, it returns (beacause no servo is needed)
+                return
     move_servo(SERVOS[data], IR_SENSORS[data])
     return
                  
 def which_servo_2(data):
-    move_servo(SERVOS[data], IR_SENSORS[data])
-    return
+    if data == 4:
+        if GPIO.input(IR_SENSORS[5]):       #if the last IR sensor senses it, it returns (beacause no servo is needed)
+                return
+    else:
+        move_servo(SERVOS[data], IR_SENSORS[data])
+        return
 
 def prompt_choice():
     print("Choose the way to sort:")
