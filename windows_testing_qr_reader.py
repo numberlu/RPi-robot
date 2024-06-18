@@ -25,7 +25,7 @@ def decode_qr(frame):
 
 def main():
     # Initialize the webcam
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     focus = 255  # min: 0, max: 255, increment:5
     cap.set(28, focus) 
 
