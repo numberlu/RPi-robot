@@ -31,12 +31,13 @@ class Communication:
 
 #moves servo and waits until something passes by allocated IR sensor    
 def move_servo(servo, comm, delay):
+    comm.setMotor(2, 255)
     if servo is not None:
         servo.angle = 20
-        time.sleep(delay + 2)
+        time.sleep(delay + 1)
         servo.angle = 90
     else:
-        time.sleep(delay + 2)
+        time.sleep(delay + 1)
     return
 
 def stop_first_belt(comm):
@@ -48,7 +49,7 @@ def stop_second_belt(comm):
     return
 
 def move_short_belt(comm):
-    comm.setMotor(1, 180)
+    comm.setMotor(1, 100)
     return
 
 #Takes photo, returns an image
@@ -153,6 +154,8 @@ def main(argv):
     except Exception as e:
         print(f"An error occurred with initializing servos: {e}")
 
+    for i in range(4):
+        SERVOS[i].angle = 90
 
     try:
         print("Choose the way to sort:")
@@ -163,21 +166,16 @@ def main(argv):
         print("Press anything else to quit")
         choice = input(">> ")
 
-        # initialize
-        comm.setMotor(1, 255)
-        comm.setMotor(2, 255)
-        time.sleep(1)
+        # # initialize
+        # comm.setMotor(1, 255)
+        # comm.setMotor(2, 255)
+        # time.sleep(1)
+        # comm.setMotor(1, 0)
+        # comm.setMotor(2, 0)
+        # time.sleep(1)
+
         comm.setMotor(1, 0)
-        comm.setMotor(2, 0)
-        time.sleep(1)
-
-        comm.setMotor(1, 255)
         comm.setMotor(2, 255)
-        print("this one is second")
-
-        for i in range(4):
-            SERVOS[i].angle = 90
-            
 
         #Sorting based on QR codes
         if choice == "1":
@@ -220,7 +218,7 @@ def main(argv):
             while True:
                 #check for IR sensor input
                 if input("Press x to manually notice a disk: ") == "x":
-                    stop_first_belt(comm)
+                    stop_second_belt(comm)
                     for i in range(5):
                         image = take_photo()
                         if image is not None:
@@ -244,16 +242,32 @@ def main(argv):
                 if input("Press x to manually notice a disk: ") == "x":
                     choice = input("Choose the servos 1 through 4, where all other inputs are unknown: ")
                     match choice:
-                        case "1":                            
+                        case "1":      
+                            comm.setMotor(1, 100)
+                            time.sleep(0.7)
+                            comm.setMotor(1, 0)                      
                             move_servo(SERVOS[0], comm, 0)
                         case "2":
+                            comm.setMotor(1, 100)
+                            time.sleep(0.7)
+                            comm.setMotor(1, 0)
                             move_servo(SERVOS[1], comm, 1)
                         case "3":
+                            comm.setMotor(1, 100)
+                            time.sleep(0.7)
+                            comm.setMotor(1, 0)
                             move_servo(SERVOS[2], comm, 2)
                         case "4":
+                            comm.setMotor(1, 100)
+                            time.sleep(0.7)
+                            comm.setMotor(1, 0)
                             move_servo(SERVOS[3], comm, 3)
                         case _:
-                            move_servo(SERVOS[4], comm, 4)    
+                            comm.setMotor(1, 100)
+                            time.sleep(0.7)
+                            comm.setMotor(1, 0)
+                            move_servo(SERVOS[4], comm, 4)   
+                    comm.setMotor(2, 255)
         else:
             print("Quitting...")
             print("Program terminated")
